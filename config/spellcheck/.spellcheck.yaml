@@ -1,0 +1,48 @@
+matrix:
+- name: Markdown (English docs)
+  aspell:
+    lang: en
+    ignore-case: true
+  dictionary:
+    wordlists:
+    - config/spellcheck/.wordlist_en.txt
+    encoding: utf-8
+    output: build/dictionary/dictionary_en.dic
+  pipeline:
+  - pyspelling.filters.markdown:
+      markdown_extensions:
+        - pymdownx.superfences:
+        - markdown.extensions.extra:
+  - pyspelling.filters.html:
+      comments: false
+      attributes:
+        - title
+        - alt
+      ignores:
+      - :matches(code, pre)
+      - 'code'
+      - 'pre'
+  sources:
+  - '*.md'
+  - 'dataset_processing/*.md'
+  default_encoding: utf-8
+
+- name: Docstrings
+  aspell:
+    lang: en
+    ignore-case: true
+  dictionary:
+    wordlists:
+    - config/spellcheck/.wordlist_en.txt
+    encoding: utf-8
+    output: build/dictionary/dictionary.dic
+  pipeline:
+  - pyspelling.filters.python:
+      docstrings: true
+      comments: false
+  sources:
+    - 'config/*/*.py'
+    - 'dataset_processing/*.py'
+    - 'pipeline/*.py'
+    - 'pipeline/*/*.py'
+  default_encoding: utf-8

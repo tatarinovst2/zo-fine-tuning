@@ -1,0 +1,14 @@
+coverage==7.13.5
+darglint==1.8.1
+flake8-isort==7.0.0
+flake8-pyproject==1.2.4
+flake8==7.3.0
+mypy==2.0.0
+pandas-stubs==3.0.0.260204
+pydocstyle==6.3.0
+pylint==4.0.5
+pymarkdownlnt==0.9.37
+pymdown-extensions==10.21.2
+pyspelling==2.12.1
+pytest==9.0.3
+types-tqdm==4.67.3.20260508

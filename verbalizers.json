@@ -1,0 +1,69 @@
+{
+  "configs": [
+    {
+      "datasets": ["boolq", "wic"],
+      "label_names": [
+        "no",
+        "yes"
+      ],
+      "verbalizers": [
+        [
+          " no"
+        ],
+        [
+          " yes"
+        ]
+      ]
+    },
+    {
+      "datasets": ["emotion"],
+      "label_names": [
+        "sadness",
+        "joy",
+        "love",
+        "anger",
+        "fear",
+        "surprise"
+      ],
+      "verbalizers": [
+        [
+          " sadness"
+        ],
+        [
+          " joy"
+        ],
+        [
+          " love"
+        ],
+        [
+          " anger"
+        ],
+        [
+          " fear"
+        ],
+        [
+          " surprise"
+        ]
+      ]
+    },
+    {
+      "datasets": ["mnli", "multi-nli", "multi_nli"],
+      "label_names": [
+        "entailment",
+        "neutral",
+        "contradiction"
+      ],
+      "verbalizers": [
+        [
+          " entailment"
+        ],
+        [
+          " neutral"
+        ],
+        [
+          " contradiction"
+        ]
+      ]
+    }
+  ]
+}

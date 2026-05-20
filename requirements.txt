@@ -1,0 +1,10 @@
+accelerate==1.11.0
+datasets==4.4.2
+evaluate==0.4.6
+matplotlib==3.10.0
+numpy==2.0.2
+peft==0.18.1
+rouge_score==0.1.2
+sacrebleu==2.6.0
+torch==2.11.0
+transformers==4.57.6

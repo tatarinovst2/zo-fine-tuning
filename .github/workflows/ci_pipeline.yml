@@ -1,0 +1,184 @@
+name: "Check Pull Request Readiness"
+
+on:
+#  push:  # Stop for now
+#    branches: [ main ]
+#  pull_request:
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REPOSITORY_TYPE: private
+  GITHUB_REPOSITORY: ${{ github.repository }}
+  BRANCH_NAME: ${{ github.ref }}
+
+jobs:
+  install-dependencies:
+    name: Installing dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: bash config/venv_setup.sh
+
+  code-style:
+    name: Code Style
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Code Style
+        run: |
+          bash config/pylint/run_pylint.sh
+
+  mypy-checks:
+    name: Mypy checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: MyPy check
+        run: |
+          bash config/run_mypy.sh
+
+  unittests:
+    name: Unittests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Run tests
+        run: |
+          bash config/run_tests.sh
+
+  spellcheck:
+    name: Spellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+    steps:
+      - uses: actions/checkout@master
+      - name: Install Aspell
+        run: |
+          sudo apt-get install aspell aspell-en aspell-ru
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Spell check
+        run: |
+          bash config/spellcheck/run_spellcheck.sh
+
+  flake8-checks:
+    name: Import style checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Flake8 check
+        run: |
+          bash config/run_flake8.sh
+
+  pymarkdownlnt-checks:
+    name: Pymarkdownlnt checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Pymarkdownlnt check
+        run: |
+          bash config/run_pymarkdownlnt.sh
+
+  requirements-check:
+    name: Requirements check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Dependencies check
+        run: |
+          bash config/requirements_check/run_requirements_check.sh
+
+  docstring-style-checks:
+    name: Docstring style checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Docstring style checks
+        run: |
+          bash config/run_docstrings_check.sh
+
+  newline-check:
+    name: Newline check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [ install-dependencies ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Newline check
+        run: |
+          bash config/newline_check/run_newline_check.sh
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [ unittests ]
+    env:
+      PR_NAME: ${{ github.event.pull_request.title }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: |
+          bash config/venv_setup.sh
+      - name: Run start
+        run: |
+          bash config/run_coverage.sh

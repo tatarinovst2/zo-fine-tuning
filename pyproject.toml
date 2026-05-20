@@ -1,0 +1,98 @@
+[tool.pytest.ini_options]
+markers = [
+    "utils"
+]
+pythonpath = [
+    "utils"
+]
+
+[tool.coverage.run]
+omit = [
+    "*__init__.py",
+    "*_test.py",
+    "/tmp/*",
+    "config.py",
+    "config-3.py"
+]
+
+[tool.coverage.report]
+fail_under=80
+omit = [
+    "*/.cache/*",
+    "*/var/folders/*",
+    "/tmp/*",
+    "config.py",
+    "config-3.py"
+]
+
+[[tool.mypy.overrides]]
+module = ["dataset_processing/*", "pipeline/*", "visualization/*"]
+disable_error_code = [
+    'import-untyped',
+    'import-not-found'
+]
+
+[tool.mypy]
+exclude = [
+    'venv'
+]
+
+[tool.isort]
+py_version = '312'
+skip_gitignore = true
+line_length = 100
+order_by_type = true
+remove_redundant_aliases = true
+group_by_package = true
+force_alphabetical_sort_within_sections = true
+src_paths = ["pipeline", "dataset_processing", "visualization"]
+known_first_party = [
+    'utils',
+    'constants',
+    'check_metrics',
+    'trainers',
+    'visualization',
+    'metrics',
+    'visualize'
+]
+
+[tool.pydocstyle]
+convention = 'pep257'
+match-dir = '^(?!(tests|\.)).*'
+add-ignore = [
+    'D104',
+    'D105',
+    'D107'
+]
+
+[tool.flake8]
+max-line-length = 120
+exclude = [
+    'venv*',
+    'build/'
+]
+application_import_names = [
+    'utils',
+    'constants'
+]
+select = ['I']
+count = true
+
+[tool.pymarkdown]
+rules = [
+    "md013",
+    "md028",
+    "md033"
+]
+
+[tool.pymarkdown.plugins.md013]
+enabled = true
+line_length = 120
+heading_line_length = 120
+code_block_line_length = 120
+
+[tool.pymarkdown.plugins.md028]
+enabled = false
+
+[tool.pymarkdown.plugins.md033]
+enabled = false
