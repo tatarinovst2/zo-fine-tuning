@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$DATASET_DIR" || -z "$TRAINER_TYPE" || -z "$LR" ]]
+if [[ -z "$DATASET_DIR" || -z "$TRAINER_TYPE" || -z "$LR" ]]; then
   echo "Usage:"
   echo "$0 \\"
   echo "  --dataset_dir <dataset> \\"
@@ -60,8 +60,13 @@ fi
 sanitize() {
   echo "$1" | sed 's#[/ ]#-#g'
 }
+basename_sanitized() {
+  local p="${1%/}"      # strip trailing /
+  echo "$(basename "$p")" | sed 's#[/ ]#-#g'
+}
 
 EXP_NAME="${TRAINER_TYPE}"
+EXP_NAME+="_$(basename_sanitized "$DATASET_DIR")"
 EXP_NAME+="_lr$(sanitize "$LR")"
 
 # Include extra args in experiment name
@@ -97,11 +102,25 @@ SAVE_STEPS=2000
 EVAL_STEPS=100
 LOGGING_STEPS=100
 
-if [[ "$TRAINER_TYPE" == "zomuon" ]]; then
+if [[ "$TRAINER_TYPE" == "zomuon" || "$TRAINER_TYPE" == "zomuonm" ]]; then
   MAX_STEPS=8000
   SAVE_STEPS=800
   EVAL_STEPS=40
   LOGGING_STEPS=40
+fi
+
+if [[ "$TRAINER_TYPE" == "hizoo" ]]; then
+  MAX_STEPS=13200
+  SAVE_STEPS=1320
+  EVAL_STEPS=66
+  LOGGING_STEPS=66
+fi
+
+if [[ "$TRAINER_TYPE" == "fzoo" ]]; then
+  MAX_STEPS=4400
+  SAVE_STEPS=440
+  EVAL_STEPS=22
+  LOGGING_STEPS=22
 fi
 
 CMD=(

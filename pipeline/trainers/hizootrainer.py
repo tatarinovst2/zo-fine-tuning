@@ -146,7 +146,7 @@ class HiZOOTrainer(BaseZOTrainer):
 
         self._maybe_empty_cache()
 
-        return loss_plus_sum / self.zo_num_directions
+        return loss_plus_sum / (self.args.gradient_accumulation_steps * self.zo_num_directions)
 
     def zo_update(self, learning_rate: float) -> None:
         """
@@ -181,31 +181,24 @@ class HiZOOTrainer(BaseZOTrainer):
                     mean=0, std=1, size=param.data.size(), device=param.device, dtype=param.dtype
                 )
 
-                # hessian_temp = self.hessian_matrix[name] * z * z
                 hessian_temp = self.hessian_matrix[name] * z  # alloc 1 full tensor
                 hessian_temp.mul_(z)  # now hessian_temp == H * z * z
 
-                # hessian_estimator = hess_sum * hessian_temp * self.zo_hessian_smooth / (2 * (self.zo_eps ** 2))
                 hessian_estimator = hessian_temp  # alias
                 hessian_estimator.mul_(
                     hess_sum * self.zo_hessian_smooth / (2.0 * (self.zo_eps ** 2))
                 )
 
-                # self.hessian_matrix[name] = (1 - self.zo_hessian_smooth) * self.hessian_matrix[name] + hessian_estimator
                 self.hessian_matrix[name].mul_(1.0 - self.zo_hessian_smooth).add_(hessian_estimator)
 
-                # precond_grad = grad_sum * z / torch.sqrt(self.hessian_matrix[name])
-                denom = torch.sqrt(
-                    self.hessian_matrix[name])  # alloc 1 full tensor
+                denom = torch.sqrt(self.hessian_matrix[name])  # alloc 1 full tensor
                 precond_grad = z  # reuse z buffer (no new tensor)
                 precond_grad.mul_(grad_sum).div_(denom)
 
                 if "bias" not in name and "layer_norm" not in name and "layernorm" not in name:
-                    # param.data -= learning_rate * (precond_grad + self.args.weight_decay * param.data)
                     precond_grad.add_(param.data, alpha=float(self.args.weight_decay))
                     param.data.add_(precond_grad, alpha=-learning_rate)
                 else:
-                    # param.data -= learning_rate * precond_grad
                     param.data.add_(precond_grad, alpha=-learning_rate)
 
         self.zo_direction_accumulator = []

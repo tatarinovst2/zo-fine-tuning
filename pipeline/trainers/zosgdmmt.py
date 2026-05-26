@@ -205,7 +205,7 @@ class ZOSGDMMTTrainer(BaseZOTrainer):  # pylint: disable=too-many-instance-attri
                 # g = grad_sum * z
 
                 # if self.args.weight_decay > 0.0 and (
-                #         "bias" not in name and "layer_norm" not in name and "layernorm" not in name
+                #        "bias" not in name and "layer_norm" not in name and "layernorm" not in name
                 # ):
                 #     wd_target = (
                 #         self.master_params[name]

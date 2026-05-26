@@ -174,7 +174,6 @@ class ZOMuonTrainer(BaseZOTrainer):  # pylint: disable=too-many-instance-attribu
         Perturb the model parameters with a random noise z.
 
         :param scaling_factor: Scaling factor for the perturbation.
-        :raises ValueError: If the ZO random seed is not set.
         """
         torch.manual_seed(self.zo_random_seed)
 

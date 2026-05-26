@@ -48,7 +48,6 @@ class MeZOForEachTrainer(BaseZOTrainer):
 
         if self.trainer_mode == "zo":
             for param in self.model.parameters():
-                print(param.data.size())
                 param.requires_grad = False
 
         self._build_param_groups(mem_cap_bytes=None)
@@ -61,10 +60,11 @@ class MeZOForEachTrainer(BaseZOTrainer):
     # Grouping utilities
     ########################
 
-    def _build_param_groups(self, mem_cap_bytes = None) -> None:
+    def _build_param_groups(self, mem_cap_bytes: int | None = None) -> None:
         """
         Build contiguous groups of parameters (single-device assumption) subject to a memory cap.
-        Maintains deterministic order by sorted parameter names.
+
+        :param mem_cap_bytes: Optional custom memory cap in bytes for a group.
         """
         params_in_order = self.trainable_params  # already sorted by name
         max_param_bytes = max(param.numel() * param.element_size() for _, param in params_in_order)
@@ -92,6 +92,21 @@ class MeZOForEachTrainer(BaseZOTrainer):
                 for (name, param), use_decay in zip(group["items"], group["decay_mask"])
                 if use_decay
             ]
+
+        self._noise_buffers = {}
+        max_elems_by_key: dict[tuple[torch.device, torch.dtype], int] = {}
+
+        for grp in self._groups:
+            device = grp["params"][0].device
+            dtype = grp["params"][0].dtype
+            key = (device, dtype)
+            total_elems = sum(grp["numels"])
+            max_elems_by_key[key] = max(max_elems_by_key.get(key, 0), total_elems)
+
+        for (device, dtype), max_elems in max_elems_by_key.items():
+            self._noise_buffers[(device, dtype)] = torch.empty(
+                max_elems, device=device, dtype=dtype
+            )
 
         print(f"Built {len(self._groups)} groups with cap {cap/1e6:.2f} MB.")
 
@@ -125,6 +140,7 @@ class MeZOForEachTrainer(BaseZOTrainer):
         Perturb the model parameters with a random noise z.
 
         :param scaling_factor: Scaling factor for the perturbation.
+        :raises RuntimeError: If zo_random_seed is not set.
         """
         seed = self.zo_random_seed
         if seed is None:
@@ -138,8 +154,9 @@ class MeZOForEachTrainer(BaseZOTrainer):
             dt = grp["params"][0].dtype
 
             total_elems = sum(grp["numels"])
-            noise_flat = torch.empty(total_elems, device=dev, dtype=dt)
-            noise_flat.normal_(generator=g)
+            noise_buf = self._noise_buffers[(dev, dt)]
+            noise_buf.normal_(generator=g)
+            noise_flat = noise_buf[:total_elems]
 
             splits = noise_flat.split(grp["numels"])
             noise_list = [s.view(sh) for s, sh in zip(splits, grp["shapes"])]
@@ -209,8 +226,9 @@ class MeZOForEachTrainer(BaseZOTrainer):
                 dt = grp["params"][0].dtype
 
                 total_elems = sum(grp["numels"])
-                noise_flat = torch.empty(total_elems, device=dev, dtype=dt)
-                noise_flat.normal_(generator=g)
+                noise_buf = self._noise_buffers[(dev, dt)]
+                noise_buf.normal_(generator=g)
+                noise_flat = noise_buf[:total_elems]
 
                 splits = noise_flat.split(grp["numels"])
                 noise_list = [s.view(sh) for s, sh in zip(splits, grp["shapes"])]

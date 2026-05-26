@@ -16,6 +16,7 @@ from constants import ROOT_DIR
 
 class DatasetInfoDict(TypedDict, total=False):
     """TypedDict for dataset information used in DATASET_OPTIONS."""
+
     dataset_link: str
     dataset_path: str
     balance: bool

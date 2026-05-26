@@ -8,53 +8,69 @@ from matplotlib import pyplot as plt
 from visualize import load_log_history, smooth_data
 
 
-def extract_series(history: list[dict[str, Any]], key: str,
-                   max_steps: int | None = None) -> tuple[list[float], list[int], list[float]]:
+def extract_series(history: list[dict[str, Any]], key: str, step_scale: float = 1.0,
+                   max_steps: int | None = None,     # cap raw trainer steps
+                   max_x: float | None = None,       # cap scaled x (e.g. forwards)
+) -> tuple[list[float], list[float]]:
     """
-    Extract (epochs, steps, values) for a given metric key.
+    Extract (epochs, scaled_steps, values) for a given metric key.
 
     :param history: Trainer log history entries.
     :param key: Metric name to extract (e.g., 'loss', 'eval_loss').
-    :param max_steps: Optional maximum step to include in the series.
-    :return: Tuple of (epochs, steps, values).
+    :param step_scale: Multiplier applied to entry["step"] (e.g. forwards per step).
+    :param max_steps: Optional maximum raw step to include.
+    :param max_x: Optional maximum scaled step (x) to include.
+    :return: Tuple of (epochs, scaled_steps, values).
     """
-    epochs, steps, vals = [], [], []
+    xs: list[float] = []
+    vals: list[float] = []
+
     for entry in history:
-        if key in entry:
-            if max_steps is not None and entry["step"] > max_steps:
-                continue
+        if key not in entry:
+            continue
+        if "step" not in entry:
+            continue
 
-            if "epoch" in entry:
-                epochs.append(entry["epoch"])
-            steps.append(entry["step"])
-            vals.append(entry[key])
-    return epochs, steps, vals
+        raw_step = entry["step"]
+        if max_steps is not None and raw_step > max_steps:
+            continue
+
+        x = raw_step * step_scale
+        if max_x is not None and x > max_x:
+            continue
+
+        xs.append(x)
+        vals.append(entry[key])
+
+    return xs, vals
 
 
-def plot_loss_type(runs: list[dict[str, Any]], loss_key: str, x_axis: str = "epoch",
-                   smooth: bool = True, smooth_threshold: int = 50, max_steps: int | None = None):
+def plot_loss_type(runs: list[dict[str, Any]], loss_key: str,
+                   x_name: str | None = None,  # only used when x_axis == "step"
+                   smooth: bool = True, smooth_threshold: int = 50, max_steps: int | None = None,
+                   max_x: float | None = None):
     """
     Plot training or evaluation loss across multiple runs.
 
     :param runs: List of runs with 'label' and 'history'.
     :param loss_key: Loss key ('loss' or 'eval_loss').
-    :param x_axis: X-axis type ('epoch' or 'step').
+    :param x_name: X-axis name to use when x_axis is 'step' (e.g. 'Forwards').
     :param smooth: Whether to apply smoothing.
     :param smooth_threshold: Minimum points before smoothing is applied.
     :param max_steps: Optional maximum step to include in the plot.
-    :raises ValueError: If x_axis is not 'epoch' or 'step'.
+    :param max_x: Optional maximum scaled step (x) to include in the plot (e.g. forwards cap).
     """
-    if x_axis not in ("epoch", "step"):
-        raise ValueError("x_axis must be 'epoch' or 'step'")
-
     plt.figure(figsize=(8, 4))
     for run in runs:
         label = run["label"]
-        epochs, steps, vals = extract_series(run["history"], loss_key,
-                                             max_steps=max_steps)
+        step_scale = run.get("step_scale", 1.0)
+
+        xs, vals = extract_series(run["history"], loss_key, step_scale=step_scale,
+                                  max_steps=max_steps, max_x=max_x)
         if not vals:
             continue  # e.g. no eval_loss in some runs
-        x = epochs if x_axis == "epoch" else steps
+
+        x = xs
         y = vals
 
         if smooth and len(y) > smooth_threshold:
@@ -64,8 +80,8 @@ def plot_loss_type(runs: list[dict[str, Any]], loss_key: str, x_axis: str = "epo
         plt.plot(x, y, label=label, marker=None)
 
     pretty_key = "Train Loss" if loss_key == "loss" else "Eval Loss"
-    plt.title(f"{pretty_key} vs {x_axis.capitalize()}")
-    plt.xlabel(x_axis.capitalize())
+    plt.title(f"{pretty_key} vs {(x_name or 'Step')}")
+    plt.xlabel(x_name or "Step")
     plt.ylabel(pretty_key)
     plt.legend(fontsize=9)
     plt.grid(True)
@@ -73,54 +89,38 @@ def plot_loss_type(runs: list[dict[str, Any]], loss_key: str, x_axis: str = "epo
     plt.show()
 
 
-def plot_metric_comparison(runs: list[dict[str, Any]], metric: str, smooth: bool = True,
-                           smooth_threshold: int = 50, max_steps: int | None = None):
+def plot_metric_comparison(runs: list[dict[str, Any]], metric: str, x_name: str = "Step",
+                           smooth: bool = True, smooth_threshold: int = 50,
+                           max_steps: int | None = None, max_x: float | None = None):
     """
     Plot a metric across runs vs both epoch and step.
 
     :param runs: List of runs with 'label' and 'history'.
     :param metric: Metric name to plot.
+    :param x_name: X-axis name to use when plotting against scaled steps (e.g. 'Forward').
     :param smooth: Whether to apply smoothing.
     :param smooth_threshold: Minimum points before smoothing is applied.
     :param max_steps: Optional maximum step to include in the plots.
+    :param max_x: Optional maximum scaled step (x) to include in the plots.
     """
-    # Epoch‐level
     plt.figure(figsize=(8, 4))
     for run in runs:
         label = run["label"]
-        epochs, _, vals = extract_series(run["history"], metric,
-                                         max_steps=max_steps)
+        step_scale = run.get("step_scale", 1.0)
+
+        xs, vals = extract_series(run["history"], metric, step_scale=step_scale,
+                                  max_steps=max_steps, max_x=max_x)
         if not vals:
             continue
 
         if smooth and len(vals) > smooth_threshold:
             vals = smooth_data(vals)
-            epochs = smooth_data(epochs)
-        plt.plot(epochs, vals, label=label)
+            xs = smooth_data(xs)
 
-    plt.title(f"{metric} vs Epoch")
-    plt.xlabel("Epoch")
-    plt.ylabel(metric)
-    plt.legend(fontsize=9)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+        plt.plot(xs, vals, label=label)
 
-    # Step‐level
-    plt.figure(figsize=(8, 4))
-    for run in runs:
-        label = run["label"]
-        _, steps, vals = extract_series(run["history"], metric)
-        if not vals:
-            continue
-
-        if smooth and len(vals) > smooth_threshold:
-            vals = smooth_data(vals)
-            steps = smooth_data(steps)
-        plt.plot(steps, vals, label=label)
-
-    plt.title(f"{metric} vs Step")
-    plt.xlabel("Step")
+    plt.title(f"{metric} vs {x_name}")
+    plt.xlabel(x_name)
     plt.ylabel(metric)
     plt.legend(fontsize=9)
     plt.grid(True)
@@ -152,26 +152,56 @@ def main():
         help="Extra metric keys to compare (e.g. rouge-1 accuracy)"
     )
     parser.add_argument(
+        "--step_scales",
+        nargs="+",
+        type=float,
+        default=None,
+        help="Per-run multiplier applied to logged trainer step (e.g. forwards/step). "
+             "Must match number of checkpoints. Default: all 1.0",
+    )
+    parser.add_argument(
+        "--x_name",
+        type=str,
+        default="Forwards",
+        help="X-axis name to use when plotting against scaled steps (e.g. 'Forward').",
+    )
+    parser.add_argument(
         "--max_steps",
         type=int,
         default=None,
-        help="Only plot points with step <= max_steps",
+        help="Only include points with raw trainer step <= max_steps",
+    )
+    parser.add_argument(
+        "--max_x",
+        type=float,
+        default=None,
+        help="Only include points with scaled x <= max_x (e.g. forwards cap).",
     )
     args = parser.parse_args()
 
     if len(args.checkpoint_paths) != len(args.labels):
-        parser.error("Must supply same count of --checkpoint_dirs and --labels")
+        parser.error("Must supply same count of --checkpoint_paths and --labels")
+
+    if args.step_scales is None:
+        step_scales = [1.0] * len(args.checkpoint_paths)
+    else:
+        if len(args.step_scales) != len(args.checkpoint_paths):
+            parser.error("Must supply same count of --step_scales and --checkpoint_paths")
+        step_scales = args.step_scales
 
     runs = []
-    for checkpoint_path, lbl in zip(args.checkpoint_paths, args.labels):
+    for checkpoint_path, label, scale in zip(args.checkpoint_paths, args.labels, step_scales):
         history = load_log_history(Path(checkpoint_path))
-        runs.append({"label": lbl, "history": history})
+        runs.append({"label": label, "history": history, "step_scale": scale})
 
-    plot_loss_type(runs, loss_key="loss",  x_axis="step")
-    plot_loss_type(runs, loss_key="eval_loss", x_axis="step")
+    plot_loss_type(runs, loss_key="loss", x_name=args.x_name,
+                   max_steps=args.max_steps, max_x=args.max_x)
+    plot_loss_type(runs, loss_key="eval_loss", x_name=args.x_name,
+                   max_steps=args.max_steps, max_x=args.max_x)
 
-    for m in args.metrics:
-        plot_metric_comparison(runs, m)
+    for metric in args.metrics:
+        plot_metric_comparison(runs, metric, x_name=args.x_name, max_steps=args.max_steps,
+                               max_x=args.max_x)
 
 
 if __name__ == "__main__":

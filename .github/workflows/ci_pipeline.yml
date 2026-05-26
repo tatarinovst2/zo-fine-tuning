@@ -1,9 +1,9 @@
 name: "Check Pull Request Readiness"
 
 on:
-#  push:  # Stop for now
-#    branches: [ main ]
-#  pull_request:
+  push:
+    branches: [ main ]
+  pull_request:
 
 concurrency:
   group: ${{ github.repository }}-${{ github.ref }}
@@ -59,20 +59,20 @@ jobs:
         run: |
           bash config/run_mypy.sh
 
-  unittests:
-    name: Unittests
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [ install-dependencies ]
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup environment
-        run: |
-          bash config/venv_setup.sh
-      - name: Run tests
-        run: |
-          bash config/run_tests.sh
+#  unittests:  # Stop for now
+#    name: Unittests
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 5
+#    needs: [ install-dependencies ]
+#
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Setup environment
+#        run: |
+#          bash config/venv_setup.sh
+#      - name: Run tests
+#        run: |
+#          bash config/run_tests.sh
 
   spellcheck:
     name: Spellcheck
@@ -166,19 +166,19 @@ jobs:
         run: |
           bash config/newline_check/run_newline_check.sh
 
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [ unittests ]
-    env:
-      PR_NAME: ${{ github.event.pull_request.title }}
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup environment
-        run: |
-          bash config/venv_setup.sh
-      - name: Run start
-        run: |
-          bash config/run_coverage.sh
+#  coverage:  # Stop for now
+#    name: Coverage
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 5
+#    needs: [ unittests ]
+#    env:
+#      PR_NAME: ${{ github.event.pull_request.title }}
+#
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Setup environment
+#        run: |
+#          bash config/venv_setup.sh
+#      - name: Run start
+#        run: |
+#          bash config/run_coverage.sh

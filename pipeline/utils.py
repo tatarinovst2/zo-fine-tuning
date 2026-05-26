@@ -220,7 +220,6 @@ def load_causal_lm_model_for_inference(
 
     :param args: Parsed CLI arguments. Must contain ``model_name_or_path`` and optionally
         ``base_model_name_or_path``.
-    :raises ImportError: If a PEFT adapter is detected but ``peft`` is not installed.
     :raises ValueError: If the base model for a PEFT adapter cannot be determined.
     :return: Loaded causal LM model.
     """

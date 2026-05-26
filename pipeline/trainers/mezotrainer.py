@@ -131,7 +131,8 @@ class MeZOTrainer(BaseZOTrainer):
                 loss_zero = self.zo_forward(model, inputs)
 
                 if loss_zero < loss_plus and loss_zero < loss_minus:
-                    print(f"{loss_zero} is less than both {loss_plus} and {loss_minus}, skipping update for seed {seed}.")
+                    print(f"{loss_zero} is less than both {loss_plus} and {loss_minus}, "
+                          f"skipping update for seed {seed}.")
                     continue
 
             grad_estimate = ((loss_plus - loss_minus) / (2 * self.zo_eps)).item()

@@ -13,6 +13,7 @@ def compute_metrics(labels: list[str], predictions: list[str], task_type: str) -
     :param labels: List of ground truth labels.
     :param predictions: List of model predictions.
     :param task_type: Type of task ('classification', 'generation', or 'boxed_generation').
+    :raises ValueError: If task_type is not one of the expected values.
     """
     if task_type == "classification":
         accuracy, correct = get_accuracy(predictions, labels)

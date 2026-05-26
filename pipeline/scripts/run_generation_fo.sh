@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$DATASET_DIR" || -z "$OPTIM" || -z "$LR" ]]
+if [[ -z "$DATASET_DIR" || -z "$OPTIM" || -z "$LR" ]]; then
   echo "Usage:"
   echo "$0 \\"
   echo "  --dataset_dir <dataset> \\"
@@ -60,8 +60,13 @@ fi
 sanitize() {
   echo "$1" | sed 's#[/ ]#-#g'
 }
+basename_sanitized() {
+  local p="${1%/}"      # strip trailing /
+  echo "$(basename "$p")" | sed 's#[/ ]#-#g'
+}
 
-EXP_NAME="${OPTIM}"
+EXP_NAME="${TRAINER_TYPE}"
+EXP_NAME+="_$(basename_sanitized "$DATASET_DIR")"
 EXP_NAME+="_lr$(sanitize "$LR")"
 
 # Include extra args in experiment name

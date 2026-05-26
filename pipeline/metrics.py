@@ -7,11 +7,11 @@ from sympy.parsing.latex import parse_latex
 
 
 def extract_boxed(text: str) -> str:
-    """
-    Extract the content inside the last \\boxed{} in the text.
+    r"""
+    Extract the content inside the last \boxed{} in the text.
 
-    :param text: The input text containing the solution with \\boxed{}.
-    :return: The content inside the last \\boxed{}, or an empty string if not found.
+    :param text: The input text containing the solution with \boxed{}.
+    :return: The content inside the last \boxed{}, or an empty string if not found.
     """
     matches = re.findall(r'\\boxed\{([^}]*)}', text)
 
@@ -62,10 +62,10 @@ def math_expressions_equal(pred: str, gold: str) -> bool:
 
 
 def get_boxed_accuracy(predictions: list[str], labels: list[str]) -> tuple[float, int]:
-    """
+    r"""
     Compute boxed-answer accuracy for MATH-style datasets.
 
-    Extracts \\boxed{} answers and compares them symbolically.
+    Extracts \boxed{} answers and compares them symbolically.
 
     :param predictions: Model-generated solutions.
     :param labels: Ground-truth solutions.

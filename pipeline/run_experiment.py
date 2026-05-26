@@ -3,36 +3,34 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import MethodType
 from typing import Any, Callable, Type
-import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "backend:cudaMallocAsync"
 
 import numpy as np
 import torch
-from peft import get_peft_model, LoraConfig, TaskType, PeftModel, PeftMixedModel
+from peft import get_peft_model, LoraConfig, PeftMixedModel, PeftModel, TaskType
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
-from transformers import (AutoConfig, AutoModelForCausalLM, AutoTokenizer, HfArgumentParser,
-                          PreTrainedModel, PreTrainedTokenizerBase, Trainer, TrainerCallback,
-                          TrainerControl, TrainerState, TrainingArguments, BatchEncoding,
-                          PretrainedConfig)
+from tqdm import tqdm
+from transformers import (AutoConfig, AutoModelForCausalLM, AutoTokenizer, BatchEncoding,
+                          HfArgumentParser, PretrainedConfig, PreTrainedModel,
+                          PreTrainedTokenizerBase, Trainer, TrainerCallback, TrainerControl,
+                          TrainerState, TrainingArguments)
 from transformers.modeling_outputs import SequenceClassifierOutput
 from transformers.trainer_utils import EvalPrediction
-from tqdm import tqdm
 
 from metrics import get_bleu_score, get_boxed_accuracy, get_rouge_score
 from trainers.fzootrainer import FZOOTrainer, FZOOTrainingArguments
 from trainers.hizootrainer import HiZOOTrainer, HiZOOTrainingArguments
 from trainers.lozomtrainer import LOZOMTrainer, LOZOMTrainingArguments
 from trainers.lozotrainer import LOZOTrainer, LOZOTrainingArguments
-from trainers.mezotrainer import MeZOTrainer, MeZOTrainingArguments
 from trainers.mezoforeachtrainer import MeZOForEachTrainer
+from trainers.mezotrainer import MeZOTrainer, MeZOTrainingArguments
 from trainers.zoadamtrainer import ZOAdamTrainer, ZOAdamTrainingArguments
+from trainers.zomuonmtrainer import ZOMuonMTrainer, ZOMuonMTrainingArguments
 from trainers.zomuontrainer import ZOMuonTrainer, ZOMuonTrainingArguments
 from trainers.zosgdmmt import ZOSGDMMTTrainer, ZOSGDMMTTrainingArguments
 from utils import (build_answer_to_label_map, compute_next_token_option_logits,
                    get_first_token_verbalizer_ids, load_verbalizers_json, read_jsonl,
                    select_one_verbalizer_per_label, set_seed, shuffle_in_place)
-
 
 # Argument dataclass
 
@@ -57,6 +55,7 @@ class ExperimentArguments:  # pylint: disable=too-many-instance-attributes
     :param lora_target_modules: LoRA target modules (e.g., "q_proj,v_proj", auto-detect if empty).
     :param custom_lora_weights_init: Optional LoRA init method (e.g., "pissa", empty by default).
     """
+
     dataset_dir: str = field(
         metadata={"help": "Path to directory with train.jsonl, val.jsonl, test.jsonl."}
     )
@@ -218,13 +217,16 @@ def patch_causal_lm_for_next_token_option_classification(
         return_dict: bool | None = None,
         **kwargs,
     ):
-        """Forward pass for next-token option classification.
+        """
+        Forward pass for next-token option classification.
 
+        :param self: The model instance (automatically passed by MethodType).
         :param input_ids: Prompt input ids of shape ``[batch_size, seq_len]``.
         :param attention_mask: Attention mask of shape ``[batch_size, seq_len]``.
         :param labels: Integer class labels of shape ``[batch_size]``.
         :param return_dict: Whether to return a Hugging Face model output.
         :param kwargs: Additional keyword arguments. ``use_cache`` is ignored.
+        :raises ValueError: If ``input_ids`` is not provided.
         :return: ``SequenceClassifierOutput`` or tuple.
         """
         if input_ids is None:
@@ -315,9 +317,7 @@ class NextTokenClassificationDataset:
 
 
 class NextTokenClassificationCollator:  # pylint: disable=too-few-public-methods
-    """
-    Padding collator for next-token classification.
-    """
+    """Padding collator for next-token classification."""
 
     def __init__(
         self,
@@ -328,6 +328,7 @@ class NextTokenClassificationCollator:  # pylint: disable=too-few-public-methods
         self.pad_to_multiple_of = pad_to_multiple_of
 
     def __call__(self, features: list[dict[str, Any]]) -> BatchEncoding:
+        """Collate and pad a batch of next-token classification examples."""
         input_features = [
             {
                 "input_ids": feature["input_ids"],
@@ -361,6 +362,7 @@ class CausalLMDataset:
       - Input is [prompt tokens] + [target tokens]
       - Labels are [-100 for prompt tokens] + [target tokens]
     """
+
     def __init__(self, examples: list[dict[str, Any]], tokenizer: PreTrainedTokenizerBase,
                  max_input_length: int = 1024, max_target_length: int = 128,
                  add_eos_to_target: bool = True) -> None:
@@ -420,6 +422,7 @@ class CausalLMDataCollator:  # pylint: disable=too-few-public-methods
         self.label_pad_token_id = label_pad_token_id
 
     def __call__(self, features: list[dict[str, Any]]) -> BatchEncoding:
+        """Collate and pad a batch of examples, ensuring labels are padded."""
         input_features = [
             {
                 "input_ids": feature["input_ids"],
@@ -517,7 +520,7 @@ class GenerationEvalCallback(TrainerCallback):
         self.calculate_generation_metrics_per_evals = calculate_generation_metrics_per_evals
         self.boxed_generation = boxed_generation
 
-    def _run_generation_loop(self, model: PreTrainedModel,
+    def _run_generation_loop(self, model: PreTrainedModel,  # pylint: disable=too-many-locals
                              dataloader: DataLoader) -> tuple[list[str], list[str]]:
         """
         Run generation on the entire eval dataset and collect predictions and references.
@@ -525,6 +528,7 @@ class GenerationEvalCallback(TrainerCallback):
         :param model: The model to use for generation (should be a causal LM).
         :param dataloader: An eval DataLoader, with 'input_ids', 'attention_mask', and 'labels'.
         :raises TypeError: If the model does not support .generate().
+        :raises ValueError: If tokenizer.pad_token_id is not set.
         :return: A tuple of (predictions, references), where each is a list of strings.
         """
         device = next(model.parameters()).device
@@ -669,6 +673,7 @@ TRAINER_REGISTRY: dict[str, type[Trainer]] = {
     "fzoo": FZOOTrainer,
     "hizoo": HiZOOTrainer,
     "zomuon": ZOMuonTrainer,
+    "zomuonm": ZOMuonMTrainer,
     "mezoforeach": MeZOForEachTrainer
 }
 
@@ -720,6 +725,7 @@ def train_classification(exp_args: ExperimentArguments, train_args: TrainingArgu
     :param train_args: TrainingArguments to control optimization and logging.
     :param dataset_dir: Directory with train/val/test jsonl files.
     :param output_dir: Output directory to store checkpoints and logs.
+    :raises ValueError: If model.config is invalid or model is not a PreTrainedModel.
     """
     train_args.output_dir = str(output_dir)
 
@@ -799,10 +805,6 @@ def train_classification(exp_args: ExperimentArguments, train_args: TrainingArgu
 
     collator = NextTokenClassificationCollator(tokenizer=tokenizer, pad_to_multiple_of=8)
 
-    train_args.load_best_model_at_end = True
-    train_args.metric_for_best_model = "accuracy"
-    train_args.greater_is_better = True
-
     if getattr(train_args, "optim", None) is None:
         train_args.optim = "adamw_torch"
 
@@ -812,7 +814,6 @@ def train_classification(exp_args: ExperimentArguments, train_args: TrainingArgu
                           compute_metrics=classification_compute_metrics_fn())
 
     trainer.train()
-    # trainer.save_model(str(output_dir / "last"))
 
 
 def train_generation(exp_args: ExperimentArguments, train_args: TrainingArguments,
@@ -824,6 +825,7 @@ def train_generation(exp_args: ExperimentArguments, train_args: TrainingArgument
     :param train_args: TrainingArguments to control optimization and logging.
     :param dataset_dir: Directory with train/val/test jsonl files.
     :param output_dir: Output directory to store checkpoints and logs.
+    :raises ValueError: If model.config is invalid or model is not a PreTrainedModel.
     """
     train_args.output_dir = str(output_dir)
 
@@ -903,7 +905,6 @@ def train_generation(exp_args: ExperimentArguments, train_args: TrainingArgument
     trainer.add_callback(gen_cb)
 
     trainer.train()
-    # trainer.save_model(str(output_dir / "last"))
 
 
 # TrainingArguments registry
@@ -918,6 +919,7 @@ TRAINING_ARGS_REGISTRY = {
     "fzoo": FZOOTrainingArguments,
     "hizoo": HiZOOTrainingArguments,
     "zomuon": ZOMuonTrainingArguments,
+    "zomuonm": ZOMuonMTrainingArguments,
     "mezoforeach": MeZOTrainingArguments
 }
 
