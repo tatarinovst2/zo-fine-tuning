@@ -1,4 +1,4 @@
-name: "Check Pull Request Readiness"
+name: "Check Readiness"
 
 on:
   push:
