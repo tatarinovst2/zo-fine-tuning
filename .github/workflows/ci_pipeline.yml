@@ -32,7 +32,7 @@ jobs:
   code-style:
     name: Code Style
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     needs: [ install-dependencies ]
 
     steps:
